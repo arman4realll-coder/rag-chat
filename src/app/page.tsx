@@ -40,12 +40,28 @@ export default function Home() {
     scrollToBottom();
   }, [messages]);
 
+  // Play audio immediately without waiting for React
+  const playAudioImmediately = (audioUrl: string) => {
+    const audio = new Audio(audioUrl);
+    audio.preload = 'auto';
+    audioRef.current = audio;
+
+    // Start playing as soon as possible
+    audio.play().catch(err => {
+      console.warn('Autoplay blocked:', err);
+    });
+  };
+
   const processResponse = async (response: Response) => {
     const contentType = response.headers.get('content-type');
 
     if (contentType && (contentType.includes('audio/') || contentType.includes('application/octet-stream'))) {
       const blob = await response.blob();
       const audioUrl = URL.createObjectURL(blob);
+
+      // PLAY IMMEDIATELY - don't wait for React state update
+      playAudioImmediately(audioUrl);
+
       const headerText = response.headers.get('x-n8n-text') || response.headers.get('x-text-content');
       let textContent = 'Playing audio response...';
 
@@ -61,9 +77,13 @@ export default function Home() {
     } else {
       const data = await response.json();
       const botMessage: Message = { role: 'bot', content: data.response };
+
+      // If JSON response includes audio URL, play it immediately
       if (data.audioUrl) {
+        playAudioImmediately(data.audioUrl);
         botMessage.audioUrl = data.audioUrl;
       }
+
       setMessages((prev) => [...prev, botMessage]);
     }
   };
