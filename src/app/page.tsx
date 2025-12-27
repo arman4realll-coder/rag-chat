@@ -42,6 +42,13 @@ export default function Home() {
 
   // Play audio immediately without waiting for React
   const playAudioImmediately = (audioUrl: string) => {
+    // Stop any currently playing audio first
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.src = '';
+      audioRef.current = null;
+    }
+
     const audio = new Audio(audioUrl);
     audio.preload = 'auto';
     audioRef.current = audio;
