@@ -223,18 +223,32 @@ body {
   flex: 1;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  padding: 2rem;
+  padding: 0;
   position: relative;
   z-index: 10;
   width: 100%;
   max-width: 900px;
   margin: 0 auto;
-  gap: 2rem;
+  overflow: hidden;
+  /* Main container doesn't scroll */
 }
 
-/* ===== THE ORB ===== */
+/* Hide scrollbar for Chrome/Safari/Opera */
+.conversation-display::-webkit-scrollbar {
+  display: none;
+}
+
+.chat-content {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 2rem 2rem 0;
+  gap: 1rem;
+}
+
+/* ===== ORB CONTAINER ===== */
 .orb-container {
   position: relative;
   width: 280px;
@@ -243,6 +257,12 @@ body {
   justify-content: center;
   align-items: center;
   flex-shrink: 0;
+  cursor: pointer;
+  transition: transform var(--transition-fast);
+}
+
+.orb-container:active {
+  transform: scale(0.98);
 }
 
 .orb {
@@ -484,13 +504,19 @@ body {
 .conversation-display {
   text-align: center;
   width: 100%;
-  min-height: 160px;
+  flex: 1;
+  /* Take up all remaining space */
+  overflow-y: auto;
+  /* Scroll only this area */
+  scrollbar-width: none;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
   align-items: center;
   gap: 1.25rem;
-  padding: 0 1rem;
+  padding: 1rem 2rem 4rem;
+  /* More padding at bottom to prevent cutoff */
+  margin-bottom: 0;
 }
 
 .last-user-msg {
@@ -501,8 +527,12 @@ body {
   padding: 0.6rem 1.1rem;
   border-radius: var(--border-radius-full);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  max-width: 500px;
+  max-width: 80%;
+  /* Ensure it fits on mobile */
   display: inline-block;
+  overflow-wrap: break-word;
+  /* Prevent text overflow */
+  word-wrap: break-word;
 }
 
 .current-bot-msg {
@@ -510,9 +540,16 @@ body {
   line-height: 1.6;
   font-weight: 500;
   color: var(--text-primary);
-  max-width: 700px;
+  max-width: 90%;
+  /* More flexible width */
   letter-spacing: -0.01em;
   transition: color var(--transition-normal);
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  /* Critical for long words/urls */
+  word-wrap: break-word;
+  padding: 0 10px;
+  /* Safety padding */
 }
 
 .speaking-mode .current-bot-msg {

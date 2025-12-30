@@ -40,20 +40,19 @@ export default function Home() {
     scrollToBottom();
   }, [messages]);
 
-  // Play audio immediately without waiting for React
+  // Play audio using the stable DOM element
   const playAudioImmediately = (audioUrl: string) => {
-    // Stop any currently playing audio first
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.src = '';
-      audioRef.current = null;
-    }
+    if (!audioRef.current) return;
 
-    const audio = new Audio(audioUrl);
-    audio.preload = 'auto';
-    audioRef.current = audio;
+    const audio = audioRef.current;
 
-    // Start playing as soon as possible
+    // safe pause
+    audio.pause();
+
+    audio.src = audioUrl;
+    audio.load(); // Ensure new source is loaded
+
+    // Start playing
     audio.play().catch(err => {
       console.warn('Autoplay blocked:', err);
     });
@@ -70,12 +69,15 @@ export default function Home() {
       playAudioImmediately(audioUrl);
 
       const headerText = response.headers.get('x-n8n-text') || response.headers.get('x-text-content');
-      let textContent = 'Playing audio response...';
+      let textContent = ' Playing audio response...';
 
       if (headerText) {
+        console.log('Received Header Text Length:', headerText.length);
         try {
-          textContent = decodeURIComponent(headerText);
-        } catch {
+          textContent = decodeURIComponent(headerText).replace(/\\n/g, '\n');
+        } catch (e) {
+          console.error('Decoding failed (likely truncated header):', e);
+          // Try to salvage partial text or fallback
           textContent = headerText;
         }
       }
@@ -125,6 +127,14 @@ export default function Home() {
 
   const startRecording = async () => {
     try {
+      // BARGE-IN: Stop any currently playing audio immediately
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.src = '';
+        // Do NOT set audioRef.current to null here, as the visualizer hook needs the ref to be stable.
+        // Just clearing the source stops the playback and the visualizer should naturally settle.
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
@@ -247,79 +257,90 @@ export default function Home() {
 
       {/* Main Content */}
       <main className="chat-main">
-        {/* The Animated Orb */}
-        <div className="orb-container">
-          {/* Speaking Rings */}
-          <div className="speaking-ring"></div>
-          <div className="speaking-ring"></div>
-          <div className="speaking-ring"></div>
+        <div className="chat-content">
+          {/* The Animated Orb */}
+          <div
+            className="orb-container"
+            onClick={toggleRecording}
+            role="button"
+            tabIndex={0}
+            title={isRecording ? "Stop recording" : "Tap to speak"}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                toggleRecording();
+              }
+            }}
+          >
+            {/* Speaking Rings */}
+            <div className="speaking-ring"></div>
+            <div className="speaking-ring"></div>
+            <div className="speaking-ring"></div>
 
-          {/* Audio Visualizer Bars */}
-          <div className="audio-visualizer">
-            <div className="audio-bar"></div>
-            <div className="audio-bar"></div>
-            <div className="audio-bar"></div>
-            <div className="audio-bar"></div>
-            <div className="audio-bar"></div>
-            <div className="audio-bar"></div>
-            <div className="audio-bar"></div>
-            <div className="audio-bar"></div>
+            {/* Audio Visualizer Bars */}
+            <div className="audio-visualizer">
+              <div className="audio-bar"></div>
+              <div className="audio-bar"></div>
+              <div className="audio-bar"></div>
+              <div className="audio-bar"></div>
+              <div className="audio-bar"></div>
+              <div className="audio-bar"></div>
+              <div className="audio-bar"></div>
+              <div className="audio-bar"></div>
+            </div>
+
+            <div
+              className={`orb ${orbState}`}
+              style={{
+                transform: `scale(${isSpeaking ? orbScale : (orbState === 'idle' ? 0.85 : 1)})`
+              }}
+            />
+            <div className={`orb-ring ${orbState !== 'idle' ? 'active' : ''}`} />
+
+            {(orbState === 'listening' || isSpeaking) && (
+              <>
+                <div className="ripple" />
+                <div className="ripple" />
+                <div className="ripple" />
+              </>
+            )}
           </div>
 
-          <div
-            className={`orb ${orbState}`}
-            style={{
-              transform: `scale(${isSpeaking ? orbScale : (orbState === 'idle' ? 0.85 : 1)})`
-            }}
-          />
-          <div className={`orb-ring ${orbState !== 'idle' ? 'active' : ''}`} />
-
-          {(orbState === 'listening' || isSpeaking) && (
-            <>
-              <div className="ripple" />
-              <div className="ripple" />
-              <div className="ripple" />
-            </>
-          )}
-        </div>
-
-        {/* Conversation Display */}
-        <div className="conversation-display">
-          {orbState === 'listening' ? (
-            <div className="last-user-msg">Listening...</div>
-          ) : (
-            <>
-              {lastUserMessage && !isSpeaking && (
-                <div className="last-user-msg">{lastUserMessage.content}</div>
-              )}
-              {lastBotMessage && !isLoading && !isUploading && (
-                <div className="current-bot-msg">
-                  {messages[messages.length - 1] === lastBotMessage ? displayContent : lastBotMessage.content}
-                  {lastBotMessage.audioUrl && (
-                    <audio
-                      ref={audioRef}
-                      src={lastBotMessage.audioUrl}
-                      autoPlay
-                      className="hidden"
-                      crossOrigin="anonymous"
-                    />
-                  )}
-                </div>
-              )}
-              {(isLoading || isUploading) && (
-                <div className="thinking-indicator">
-                  <div className="thinking-dots">
-                    <span></span>
-                    <span></span>
-                    <span></span>
+          {/* Conversation Display */}
+          <div className="conversation-display">
+            {orbState === 'listening' ? (
+              <div className="last-user-msg">Listening...</div>
+            ) : (
+              <>
+                {lastUserMessage && !isSpeaking && (
+                  <div className="last-user-msg">{lastUserMessage.content}</div>
+                )}
+                {lastBotMessage && !isLoading && !isUploading && (
+                  <div className="current-bot-msg">
+                    {messages[messages.length - 1] === lastBotMessage ? displayContent : lastBotMessage.content}
                   </div>
-                  <span>Thinking...</span>
-                </div>
-              )}
-            </>
-          )}
+                )}
+                {(isLoading || isUploading) && (
+                  <div className="thinking-indicator">
+                    <div className="thinking-dots">
+                      <span></span>
+                      <span></span>
+                      <span></span>
+                    </div>
+                    <span>Thinking...</span>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+          <div ref={messagesEndRef} />
+
+          {/* Persistent Audio Element for robust playback logic */}
+          <audio
+            ref={audioRef}
+            className="hidden"
+            crossOrigin="anonymous"
+          />
         </div>
-        <div ref={messagesEndRef} />
       </main>
 
       {/* Input Area */}
@@ -355,23 +376,6 @@ export default function Home() {
             disabled={isLoading || isRecording}
           />
 
-          <button
-            type="button"
-            onClick={toggleRecording}
-            className={`action-btn ${isRecording ? 'active-mic' : ''}`}
-            aria-label={isRecording ? "Stop recording" : "Start voice input"}
-            title={isRecording ? "Stop" : "Voice"}
-          >
-            {isRecording ? (
-              <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24" width="20" height="20">
-                <path d="M6 6h12v12H6z" />
-              </svg>
-            ) : (
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" width="20" height="20">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
-              </svg>
-            )}
-          </button>
 
           {!isRecording && input.trim() && (
             <button

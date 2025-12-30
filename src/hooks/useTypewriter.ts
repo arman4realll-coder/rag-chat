@@ -5,10 +5,12 @@ export const useTypewriter = (text: string, speed: number = 30) => {
 
     useEffect(() => {
         setDisplayedText('');
+        const characters = Array.from(text); // Split correctly handling emojis/unicode
         let i = 0;
+
         const timer = setInterval(() => {
-            if (i < text.length) {
-                setDisplayedText((prev) => prev + text.charAt(i));
+            if (i < characters.length) {
+                setDisplayedText(characters.slice(0, i + 1).join(''));
                 i++;
             } else {
                 clearInterval(timer);
