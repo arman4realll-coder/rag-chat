@@ -25,6 +25,19 @@ export default function Home() {
   const audioChunksRef = useRef<Blob[]>([]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  // Persistent session ID for Redis chat memory
+  const sessionIdRef = useRef<string>('');
+
+  // Initialize sessionId once on mount
+  useEffect(() => {
+    let storedId = localStorage.getItem('credit_buddy_session');
+    if (!storedId) {
+      storedId = 'session-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9);
+      localStorage.setItem('credit_buddy_session', storedId);
+    }
+    sessionIdRef.current = storedId;
+  }, []);
+
   const loudness = useAudioVisualizer(audioRef);
 
   const lastUserMessage = [...messages].reverse().find(m => m.role === 'user');
@@ -180,6 +193,7 @@ export default function Home() {
 
     const formData = new FormData();
     formData.append('audioData', audioBlob, 'recording.webm');
+    formData.append('sessionId', sessionIdRef.current); // Include session for memory
 
     try {
       const response = await fetch('/api/chat', {
@@ -211,7 +225,8 @@ export default function Home() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: userMessage,
-          previousHistory: messages
+          previousHistory: messages,
+          sessionId: sessionIdRef.current // Include session for memory
         }),
       });
 

@@ -53,7 +53,6 @@ export async function POST(req: Request) {
     }
 
     const contentType = req.headers.get('content-type') || '';
-    const sessionId = 'session-' + Date.now();
 
     console.log(`→ N8N (${contentType.includes('multipart') ? 'audio' : 'text'})`);
 
@@ -61,6 +60,7 @@ export async function POST(req: Request) {
 
     if (contentType.includes('multipart/form-data')) {
       const formData = await req.formData();
+      // sessionId should be appended by the client for voice requests
       n8nResponse = await fetch(n8nUrl, {
         method: 'POST',
         body: formData,
@@ -73,7 +73,7 @@ export async function POST(req: Request) {
         return NextResponse.json({ response: ERROR_MESSAGES.invalidRequest }, { status: 400 });
       }
 
-      const { message, previousHistory } = body;
+      const { message, previousHistory, sessionId } = body;
 
       n8nResponse = await fetch(n8nUrl, {
         method: 'POST',
@@ -81,7 +81,7 @@ export async function POST(req: Request) {
         body: JSON.stringify({
           chatInput: message,
           history: previousHistory || [],
-          sessionId: sessionId
+          sessionId: sessionId || 'default-session'
         }),
       });
     }
